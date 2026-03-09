@@ -1,158 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUNC // SATELLITE LINK</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: #5dade2; }
-        canvas { display: block; position: fixed; top: 0; left: 0; z-index: 1; }
-        #ui { position: relative; z-index: 100; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; padding: 25px; pointer-events: none; }
-        .gold { color: #f1c40f; font-weight: bold; text-shadow: 0 0 5px #000; }
-        #log, #footer { pointer-events: auto; text-shadow: 0 0 5px #000; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUNC Galaxy Modern</title>
+<style>
+  body { margin: 0; overflow: hidden; background: #000010; }
+  canvas { display: block; }
+</style>
 </head>
 <body>
-    <div id="ui">
-        <div id="log">
-            <h1>SATELLITE: LUNC-RECO-01</h1>
-            <p>CHAIN_INTEGRITY: <span id="percent" class="gold">FETCHING...</span></p>
-            <p>TREASURY_PHASE: <span id="phase-text" style="color: #2ecc71;">SYNCING...</span></p>
-        </div>
-        <div id="footer">
-            <p>GALAXY_NODES: 150 SECURED</p>
-            <p>RESERVE_LEVEL: <span id="res" class="gold">CONNECTING...</span></p>
-        </div>
-    </div>
 
-    <script>
-        let wallet = "terra18pddm2phs4mtxxjwpxccqzm4f465zchx7um32";
-        let repairFactor = 0.1; // Default slightly scattered
+<script type="module">
+// Import Three.js from CDN
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js';
+import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/controls/OrbitControls.js';
 
-        // --- 1. SCENE SETUP (Mobile Optimized) ---
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        camera.position.z = 40; 
-        
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
+// ---------------- Scene Setup ----------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000010);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 2000);
+camera.position.set(0,50,150);
 
-        const light = new THREE.PointLight(0xffffff, 1.2);
-        light.position.set(20, 20, 20);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x444444));
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.body.appendChild(renderer.domElement);
 
-        // --- 2. THE CORE (35 lightweight shards) ---
-        const planetGroup = new THREE.Group();
-        const shardGeo = new THREE.IcosahedronGeometry(1.2, 0);
-        const shardMat = new THREE.MeshPhongMaterial({ color: 0x3498db, flatShading: true });
-        
-        const shards = [];
-        for(let i=0; i<35; i++) {
-            const s = new THREE.Mesh(shardGeo, shardMat);
-            const d = 10 + Math.random() * 8;
-            s.position.set((Math.random()-0.5)*d, (Math.random()-0.5)*d, (Math.random()-0.5)*d);
-            s.userData.origin = s.position.clone(); // Remember original scattered position
-            planetGroup.add(s);
-            shards.push(s);
+// ---------------- Controls ----------------
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+
+// ---------------- Lights ----------------
+const ambient = new THREE.AmbientLight(0xffffff,0.3);
+scene.add(ambient);
+const pointLight = new THREE.PointLight(0xffffff,1.2);
+pointLight.position.set(50,50,50);
+scene.add(pointLight);
+
+// ---------------- Moon / Treasury ----------------
+const moonGeometry = new THREE.SphereGeometry(5,64,64);
+const moonMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8888ff,
+    emissive: 0x0000ff,
+    emissiveIntensity: 0.5,
+    roughness:0.3,
+    metalness:0.2
+});
+const moon = new THREE.Mesh(moonGeometry,moonMaterial);
+moon.position.set(0,20,0);
+scene.add(moon);
+
+const treasuryBalance = { value: 0 };
+const moonFullThreshold = 1000000000;
+const sunThreshold = 2000000000;
+
+// ---------------- Shattered Planet ----------------
+const planetGroup = new THREE.Group();
+const fragmentCount = 15;
+const planetFragments = [];
+for(let i=0;i<fragmentCount;i++){
+    const geom = new THREE.IcosahedronGeometry(2 + Math.random()*1.5,0);
+    const mat = new THREE.MeshStandardMaterial({ color:0x228822, roughness:0.6 });
+    const frag = new THREE.Mesh(geom,mat);
+    frag.position.set(
+        (Math.random()-0.5)*40,
+        (Math.random()-0.5)*10,
+        (Math.random()-0.5)*40
+    );
+    planetGroup.add(frag);
+    planetFragments.push(frag);
+}
+scene.add(planetGroup);
+let burnProgress = 0;
+
+// ---------------- Stars ----------------
+const starCount = 200;
+const starGeometry = new THREE.BufferGeometry();
+const positions = [];
+const colors = [];
+for(let i=0;i<starCount;i++){
+    positions.push((Math.random()-0.5)*400);
+    positions.push((Math.random()-0.5)*200);
+    positions.push((Math.random()-0.5)*400);
+    colors.push(1,1,0.7); // soft yellow
+}
+starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions,3));
+starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors,3));
+const starMaterial = new THREE.PointsMaterial({
+    size:0.8,
+    vertexColors:true,
+    transparent:true,
+    opacity:0.9,
+    blending:THREE.AdditiveBlending
+});
+const stars = new THREE.Points(starGeometry,starMaterial);
+scene.add(stars);
+
+// ---------------- Transaction Beams ----------------
+const beams = [];
+function shootBeam(from,to,color=0xffaa00){
+    const curve = new THREE.QuadraticBezierCurve3(
+        from,
+        new THREE.Vector3(
+            (from.x+to.x)/2,
+            Math.max(from.y,to.y)+10+Math.random()*5,
+            (from.z+to.z)/2
+        ),
+        to
+    );
+    const points = curve.getPoints(30);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color:color, transparent:true, opacity:0.7 });
+    const line = new THREE.Line(geometry,material);
+    line.life = 100;
+    beams.push(line);
+    scene.add(line);
+}
+
+// ---------------- Animation ----------------
+function animate(){
+    requestAnimationFrame(animate);
+
+    controls.update();
+
+    // Demo: treasury increases
+    treasuryBalance.value += 7000000;
+
+    const moonRatio = Math.min(treasuryBalance.value / moonFullThreshold,1);
+    moon.scale.setScalar(0.5 + 1.5*moonRatio);
+    moon.material.emissiveIntensity = 0.5 + 1*moonRatio;
+    if(treasuryBalance.value >= sunThreshold){
+        moon.material.color.set(0xffdd33);
+        moon.material.emissive.set(0xffaa00);
+        moon.material.emissiveIntensity = 1.5;
+    } else {
+        moon.material.color.set(0x8888ff);
+        moon.material.emissive.set(0x0000ff);
+    }
+
+    // Planet repair
+    planetFragments.forEach(frag=>{
+        frag.position.lerp(new THREE.Vector3(0,0,0), burnProgress);
+    });
+
+    // Animate beams
+    for(let i=beams.length-1;i>=0;i--){
+        beams[i].life--;
+        beams[i].material.opacity -= 0.007;
+        if(beams[i].life<=0){
+            scene.remove(beams[i]);
+            beams.splice(i,1);
         }
-        scene.add(planetGroup);
+    }
 
-        // --- 3. THE CRESCENT MOON (Mobile-Safe Group) ---
-        const moonGroup = new THREE.Group();
-        
-        const moonGeo = new THREE.SphereGeometry(3.5, 32, 32); // Slightly smoother
-        const moonMat = new THREE.MeshPhongMaterial({ color: 0xffffaa, emissive: 0x222211 });
-        const moon = new THREE.Mesh(moonGeo, moonMat);
-        moonGroup.add(moon);
+    renderer.render(scene,camera);
+}
+animate();
 
-        const shadowGeo = new THREE.SphereGeometry(3.6, 32, 32);
-        const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); 
-        const moonShadow = new THREE.Mesh(shadowGeo, shadowMat);
-        moonShadow.position.set(2.5, 0, 1); // Default Crescent
-        moonGroup.add(moonShadow);
+// ---------------- Demo beams ----------------
+setInterval(()=>{
+    const idx = Math.floor(Math.random()*starCount);
+    const positions = starGeometry.attributes.position.array;
+    const from = new THREE.Vector3(positions[idx*3],positions[idx*3+1],positions[idx*3+2]);
+    if(Math.random()<0.7){
+        shootBeam(from, moon.position.clone());
+    } else {
+        shootBeam(from, new THREE.Vector3(0,0,0));
+        burnProgress = Math.min(burnProgress + 0.015,1);
+    }
+},400);
 
-        moonGroup.position.set(10, 14, -10); 
-        scene.add(moonGroup);
+window.addEventListener('resize',()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
 
-        // --- 4. THE GALAXY (Ultra-Lightweight Point Cloud) ---
-        const starGeo = new THREE.BufferGeometry();
-        const starPos = [];
-        for(let i=0; i<150; i++) {
-            starPos.push((Math.random()-0.5)*150, (Math.random()-0.5)*150, (Math.random()-0.5)*150);
-        }
-        starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-        const starPoints = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.3 }));
-        scene.add(starPoints);
-
-        // --- 5. THE DATA LINK (Mobile-Safe Fetch) ---
-        async function updateData() {
-            try {
-                const r = await fetch(`https://terra-classic-lcd.publicnode.com/cosmos/bank/v1beta1/balances/${wallet}`);
-                const d = await r.json();
-                const b = d.balances.find(x => x.denom === 'uluna');
-                let balance = b ? parseFloat(b.amount) / 1000000 : 99.5;
-
-                document.getElementById('res').innerText = balance.toLocaleString() + " LUNC";
-                
-                // Logic: 50M = Full Moon, 100M = Sun
-                if (balance >= 100000000) {
-                    moonMat.color.setHex(0xffaa00);
-                    moonMat.emissive.setHex(0x552200);
-                    moonShadow.position.x = 10; // Moves shadow off moon completely
-                    document.getElementById('phase-text').innerText = "SOLAR_IGNITION";
-                } else if (balance >= 50000000) {
-                    moonShadow.position.x = 10;
-                    document.getElementById('phase-text').innerText = "FULL_MOON";
-                } else if (balance >= 1000000) {
-                    moonShadow.position.x = 4.0; // Waxing
-                    document.getElementById('phase-text').innerText = "WAXING";
-                } else {
-                    moonShadow.position.x = 2.5; // Crescent for 99.5 LUNC
-                    document.getElementById('phase-text').innerText = "CRESCENT";
-                }
-                
-                // Planet pulls together based on progress to 10M LUNC
-                repairFactor = Math.max(0.15, Math.min(balance / 10000000, 1));
-                document.getElementById('percent').innerText = Math.round(repairFactor * 100) + '%';
-
-            } catch (e) {
-                console.log("Using cached signal...");
-                // Keep the UI looking good even if the node drops momentarily
-                document.getElementById('res').innerText = "99.5 LUNC (CACHED)";
-                document.getElementById('percent').innerText = "15%";
-                document.getElementById('phase-text').innerText = "CRESCENT";
-            }
-        }
-
-        // --- 6. ANIMATION LOOP ---
-        function animate() {
-            requestAnimationFrame(animate);
-            planetGroup.rotation.y += 0.003;
-            planetGroup.rotation.x += 0.001;
-            starPoints.rotation.y += 0.0005;
-            
-            // This slowly pulls the shards together based on the repairFactor
-            shards.forEach(s => {
-                s.position.lerpVectors(s.userData.origin, new THREE.Vector3(0,0,0), repairFactor);
-            });
-
-            renderer.render(scene, camera);
-        }
-        
-        // Start engine and fetch data
-        animate();
-        updateData();
-        // Only fetch every 60 seconds to prevent rate limits
-        setInterval(updateData, 60000); 
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
 </body>
 </html>
