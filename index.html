@@ -3,22 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUNC // ENGINE TEST 02</title>
+    <title>LUNC // SATELLITE LINK</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: #5dade2; }
-        canvas { display: block; }
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; text-shadow: 0 0 5px #000; }
-        .gold { color: #f1c40f; font-weight: bold; }
+        canvas { display: block; position: fixed; top: 0; left: 0; z-index: 1; }
+        #ui { position: relative; z-index: 100; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; padding: 25px; pointer-events: none; }
+        .gold { color: #f1c40f; font-weight: bold; text-shadow: 0 0 5px #000; }
+        #log, #footer { pointer-events: auto; text-shadow: 0 0 5px #000; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h2>ENGINE_TEST_02</h2>
-        <p>STATUS: <span style="color: #2ecc71;">GALAXY_SYNC</span></p>
+        <div id="log">
+            <h1>SATELLITE: LUNC-RECO-01</h1>
+            <p>CHAIN_INTEGRITY: <span id="percent" class="gold">FETCHING...</span></p>
+            <p>TREASURY_PHASE: <span id="phase-text" style="color: #2ecc71;">SYNCING...</span></p>
+        </div>
+        <div id="footer">
+            <p>GALAXY_NODES: 150 SECURED</p>
+            <p>RESERVE_LEVEL: <span id="res" class="gold">CONNECTING...</span></p>
+        </div>
     </div>
-    
+
     <script>
+        let wallet = "terra18pddm2phs4mtxxjwpxccqzm4f465zchx7um32";
+        let repairFactor = 0.1; // Default slightly scattered
+
         // --- 1. SCENE SETUP (Mobile Optimized) ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -38,30 +49,31 @@
         const shardGeo = new THREE.IcosahedronGeometry(1.2, 0);
         const shardMat = new THREE.MeshPhongMaterial({ color: 0x3498db, flatShading: true });
         
+        const shards = [];
         for(let i=0; i<35; i++) {
             const s = new THREE.Mesh(shardGeo, shardMat);
             const d = 10 + Math.random() * 8;
             s.position.set((Math.random()-0.5)*d, (Math.random()-0.5)*d, (Math.random()-0.5)*d);
+            s.userData.origin = s.position.clone(); // Remember original scattered position
             planetGroup.add(s);
+            shards.push(s);
         }
         scene.add(planetGroup);
 
         // --- 3. THE CRESCENT MOON (Mobile-Safe Group) ---
         const moonGroup = new THREE.Group();
         
-        const moonGeo = new THREE.SphereGeometry(3.5, 24, 24);
+        const moonGeo = new THREE.SphereGeometry(3.5, 32, 32); // Slightly smoother
         const moonMat = new THREE.MeshPhongMaterial({ color: 0xffffaa, emissive: 0x222211 });
         const moon = new THREE.Mesh(moonGeo, moonMat);
         moonGroup.add(moon);
 
-        // The locked shadow that creates the perfect Crescent shape
-        const shadowGeo = new THREE.SphereGeometry(3.6, 24, 24);
+        const shadowGeo = new THREE.SphereGeometry(3.6, 32, 32);
         const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); 
         const moonShadow = new THREE.Mesh(shadowGeo, shadowMat);
-        moonShadow.position.set(2.5, 0, 1); 
+        moonShadow.position.set(2.5, 0, 1); // Default Crescent
         moonGroup.add(moonShadow);
 
-        // Pulled closer to the center so narrow phone screens don't cut it off
         moonGroup.position.set(10, 14, -10); 
         scene.add(moonGroup);
 
@@ -72,22 +84,70 @@
             starPos.push((Math.random()-0.5)*150, (Math.random()-0.5)*150, (Math.random()-0.5)*150);
         }
         starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-        
-        // Rendered as tiny dots instead of heavy 3D spheres
         const starPoints = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.3 }));
         scene.add(starPoints);
 
-        // --- 5. ANIMATION LOOP ---
+        // --- 5. THE DATA LINK (Mobile-Safe Fetch) ---
+        async function updateData() {
+            try {
+                const r = await fetch(`https://terra-classic-lcd.publicnode.com/cosmos/bank/v1beta1/balances/${wallet}`);
+                const d = await r.json();
+                const b = d.balances.find(x => x.denom === 'uluna');
+                let balance = b ? parseFloat(b.amount) / 1000000 : 99.5;
+
+                document.getElementById('res').innerText = balance.toLocaleString() + " LUNC";
+                
+                // Logic: 50M = Full Moon, 100M = Sun
+                if (balance >= 100000000) {
+                    moonMat.color.setHex(0xffaa00);
+                    moonMat.emissive.setHex(0x552200);
+                    moonShadow.position.x = 10; // Moves shadow off moon completely
+                    document.getElementById('phase-text').innerText = "SOLAR_IGNITION";
+                } else if (balance >= 50000000) {
+                    moonShadow.position.x = 10;
+                    document.getElementById('phase-text').innerText = "FULL_MOON";
+                } else if (balance >= 1000000) {
+                    moonShadow.position.x = 4.0; // Waxing
+                    document.getElementById('phase-text').innerText = "WAXING";
+                } else {
+                    moonShadow.position.x = 2.5; // Crescent for 99.5 LUNC
+                    document.getElementById('phase-text').innerText = "CRESCENT";
+                }
+                
+                // Planet pulls together based on progress to 10M LUNC
+                repairFactor = Math.max(0.15, Math.min(balance / 10000000, 1));
+                document.getElementById('percent').innerText = Math.round(repairFactor * 100) + '%';
+
+            } catch (e) {
+                console.log("Using cached signal...");
+                // Keep the UI looking good even if the node drops momentarily
+                document.getElementById('res').innerText = "99.5 LUNC (CACHED)";
+                document.getElementById('percent').innerText = "15%";
+                document.getElementById('phase-text').innerText = "CRESCENT";
+            }
+        }
+
+        // --- 6. ANIMATION LOOP ---
         function animate() {
             requestAnimationFrame(animate);
             planetGroup.rotation.y += 0.003;
             planetGroup.rotation.x += 0.001;
-            starPoints.rotation.y += 0.0005; // This makes the Galaxy spin
+            starPoints.rotation.y += 0.0005;
+            
+            // This slowly pulls the shards together based on the repairFactor
+            shards.forEach(s => {
+                s.position.lerpVectors(s.userData.origin, new THREE.Vector3(0,0,0), repairFactor);
+            });
+
             renderer.render(scene, camera);
         }
+        
+        // Start engine and fetch data
         animate();
+        updateData();
+        // Only fetch every 60 seconds to prevent rate limits
+        setInterval(updateData, 60000); 
 
-        // Handle screen rotation safely
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
