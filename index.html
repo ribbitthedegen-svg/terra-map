@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUNC // BURN_REALITY</title>
+    <title>LUNC // REALITY_SCAN</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #050505; font-family: 'Courier New', monospace; }
         .stat-card { border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(15, 23, 42, 0.5); }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
-<body class="text-slate-300 p-6">
+<body class="text-slate-300 p-6 pb-24">
 
     <div class="max-w-md mx-auto mb-8 border-b border-slate-800 pb-4">
         <h1 class="text-2xl font-bold text-blue-500 tracking-tighter">LUNC // REALITY_SCAN</h1>
-        <p class="text-[10px] text-slate-500 uppercase tracking-widest">System Status: Connected to Terra-Classic</p>
+        <p class="text-[10px] text-slate-500 uppercase tracking-widest">System Status: Connected to Terra-Classic [Mar 2026]</p>
     </div>
 
     <div class="max-w-md mx-auto space-y-4">
@@ -22,7 +23,7 @@
         <div class="stat-card p-5 rounded-xl">
             <p class="text-[10px] uppercase text-slate-500 mb-1">Circulating Supply</p>
             <div class="flex items-baseline gap-2">
-                <h2 id="supply" class="text-3xl font-bold text-white">5.47</h2>
+                <h2 id="supply" class="text-3xl font-bold text-white">5.46</h2>
                 <span class="text-blue-500 font-bold">T</span>
             </div>
             <div class="mt-3 w-full bg-slate-800 h-1 rounded-full overflow-hidden">
@@ -30,29 +31,53 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
-            <div class="stat-card p-4 rounded-xl">
-                <p class="text-[10px] uppercase text-slate-500 mb-1 italic">Target: $0.01</p>
-                <h3 id="days-01" class="text-xl font-bold text-white">---</h3>
-                <p class="text-[9px] text-blue-400 uppercase">Days Left</p>
+        <div class="stat-card p-5 rounded-xl border-blue-500/50">
+            <p class="text-[10px] uppercase text-blue-400 mb-3 font-bold">Custom Price Target</p>
+            <div class="flex items-center bg-black/50 rounded-lg border border-slate-800 p-2">
+                <span class="text-slate-500 mr-2">$</span>
+                <input type="number" id="target-input" value="0.01" step="0.001" 
+                       class="bg-transparent text-white w-full outline-none text-xl font-bold"
+                       oninput="calculateReality()">
             </div>
-            <div class="stat-card p-4 rounded-xl">
+            <div class="mt-4 pt-4 border-t border-slate-800 space-y-2">
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500 uppercase">Required Burn:</span>
+                    <span id="burn-needed" class="text-red-400 font-bold">---</span>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-slate-500 uppercase">Estimated Time:</span>
+                    <span id="time-estimate" class="text-green-400 font-bold">---</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div class="stat-card p-4 rounded-xl opacity-60">
                 <p class="text-[10px] uppercase text-slate-500 mb-1 italic">Target: $1.00</p>
                 <h3 id="years-1" class="text-xl font-bold text-white">---</h3>
                 <p class="text-[9px] text-blue-400 uppercase">Years Left</p>
             </div>
+            <div class="stat-card p-4 rounded-xl opacity-60">
+                <p class="text-[10px] uppercase text-slate-500 mb-1 italic">M. Cap Est.</p>
+                <h3 class="text-xl font-bold text-white">$230</h3>
+                <p class="text-[9px] text-blue-400 uppercase">Million USD</p>
+            </div>
         </div>
 
         <div class="stat-card p-4 rounded-xl border-dashed">
-            <h4 class="text-[10px] font-bold text-slate-400 mb-3 border-b border-slate-800 pb-1 uppercase">Burn Parameters</h4>
+            <h4 class="text-[10px] font-bold text-slate-400 mb-3 border-b border-slate-800 pb-1 uppercase italic">2026_BURN_METRICS</h4>
             <div class="space-y-2 text-xs">
                 <div class="flex justify-between">
-                    <span>DAILY_BURN_AVG:</span>
-                    <span class="text-green-400">540M LUNC</span>
+                    <span>MARCH_BINANCE_BURN:</span>
+                    <span class="text-green-400">858M LUNC</span>
                 </div>
                 <div class="flex justify-between">
-                    <span>MARKET_CAP_EST:</span>
-                    <span class="text-white">$242M</span>
+                    <span>JAN_BINANCE_BURN:</span>
+                    <span class="text-green-400">5.33B LUNC</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>DAILY_TAX_BURN_EST:</span>
+                    <span class="text-white">~48M-139M</span>
                 </div>
             </div>
         </div>
@@ -60,43 +85,51 @@
     </div>
 
     <script>
-        const wallet = "terra18pddm2phs4mtxxjwpxccqzm4f465zchx7um32";
-        
-        async function updateReality() {
+        let currentTotalSupply = 5460000000000; // March 2026 baseline
+
+        async function fetchSupply() {
             try {
-                // 1. Fetch real supply from the chain
                 const r = await fetch('https://terra-classic-lcd.publicnode.com/cosmos/bank/v1beta1/supply/by_denom?denom=uluna');
                 const d = await r.json();
-                const totalAmount = parseFloat(d.amount.amount) / 1000000;
-                
-                // 2. Constants for Math
-                const dailyBurn = 540000000; // Est 540M per day based on volume
-                const mCap = 242000000; // Current Market Cap
-                
-                // 3. Math Logic
-                // Target Supply = Market Cap / Target Price
-                const targetSupply01 = mCap / 0.01;
-                const targetSupply1 = mCap / 1.00;
-                
-                const daysTo01 = Math.max(0, (totalAmount - targetSupply01) / dailyBurn);
-                const daysTo1 = Math.max(0, (totalAmount - targetSupply1) / dailyBurn);
-
-                // 4. Update UI
-                document.getElementById('supply').innerText = (totalAmount / 1e12).toFixed(3);
-                document.getElementById('days-01').innerText = Math.floor(daysTo01).toLocaleString();
-                document.getElementById('years-1').innerText = (daysTo1 / 365).toFixed(1);
-                
-                // Visual Progress
-                const progress = (1 - (totalAmount / 6.9e12)) * 100;
-                document.getElementById('progress-bar').style.width = progress + "%";
-
+                currentTotalSupply = parseFloat(d.amount.amount) / 1000000;
+                document.getElementById('supply').innerText = (currentTotalSupply / 1e12).toFixed(3);
+                calculateReality();
             } catch (e) {
-                document.getElementById('tx-log').innerText = "DATA_LINK_ERROR";
+                console.log("Using March 2026 cached stats...");
+                calculateReality();
             }
         }
 
-        updateReality();
-        setInterval(updateReality, 60000); // Update every minute
+        function calculateReality() {
+            const targetPrice = parseFloat(document.getElementById('target-input').value) || 0.0001;
+            const marketCap = 230610000; // Real March 9, 2026 market cap
+            const dailyBurn = 650000000; // Est. daily burn in 2026
+
+            // Target Supply = Market Cap / Target Price
+            const targetSupply = marketCap / targetPrice;
+            const burnNeeded = Math.max(0, currentTotalSupply - targetSupply);
+            const daysToTarget = burnNeeded / dailyBurn;
+
+            // Update UI
+            document.getElementById('burn-needed').innerText = (burnNeeded / 1e12).toFixed(2) + " T";
+            
+            if (daysToTarget > 365) {
+                document.getElementById('time-estimate').innerText = (daysToTarget / 365).toFixed(1) + " YEARS";
+            } else {
+                document.getElementById('time-estimate').innerText = Math.ceil(daysToTarget) + " DAYS";
+            }
+
+            // Fixed $1 Projection for the side card
+            const daysTo1 = (currentTotalSupply - (marketCap / 1.0)) / dailyBurn;
+            document.getElementById('years-1').innerText = (daysTo1 / 365).toFixed(1);
+
+            // Progress Bar (Toward community goal of 1T supply)
+            const progress = Math.min(100, (1 - (currentTotalSupply / 6.9e12)) * 100);
+            document.getElementById('progress-bar').style.width = progress + "%";
+        }
+
+        fetchSupply();
+        setInterval(fetchSupply, 60000);
     </script>
 </body>
 </html>
