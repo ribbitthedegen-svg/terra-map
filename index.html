@@ -1,82 +1,161 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUNC // ENGINE TEST</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: #5dade2; }
-        canvas { display: block; }
-        #ui { position: absolute; top: 20px; left: 20px; z-index: 10; text-shadow: 0 0 5px #000; }
-        .gold { color: #f1c40f; font-weight: bold; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUNC Galaxy Prototype</title>
+<style>
+  body { margin: 0; overflow: hidden; background: black; }
+  canvas { display: block; }
+</style>
 </head>
 <body>
-    <div id="ui">
-        <h2>ENGINE_TEST_01</h2>
-        <p>STATUS: <span style="color: #2ecc71;">RENDER_ONLY</span></p>
-    </div>
-    
-    <script>
-        // --- 1. SCENE SETUP (Ultra-Lightweight) ---
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        camera.position.z = 40; 
-        
-        // Antialias is FALSE to prevent mobile memory crashes
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
 
-        // Simple lighting
-        const light = new THREE.PointLight(0xffffff, 1.2);
-        light.position.set(20, 20, 20);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x444444));
+<script type="module">
+// Import Three.js from CDN
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js';
 
-        // --- 2. THE CORE (Reduced to 35 shards) ---
-        const planetGroup = new THREE.Group();
-        const shardGeo = new THREE.IcosahedronGeometry(1.2, 0);
-        const shardMat = new THREE.MeshPhongMaterial({ color: 0x3498db, flatShading: true });
-        
-        for(let i=0; i<35; i++) {
-            const s = new THREE.Mesh(shardGeo, shardMat);
-            const d = 10 + Math.random() * 8;
-            s.position.set((Math.random()-0.5)*d, (Math.random()-0.5)*d, (Math.random()-0.5)*d);
-            planetGroup.add(s);
+// ---------------- Scene Setup ----------------
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000010);
+
+const camera = new THREE.PerspectiveCamera(
+  60, window.innerWidth/window.innerHeight, 0.1, 1000
+);
+camera.position.set(0, 50, 150);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// ---------------- Lights ----------------
+const ambient = new THREE.AmbientLight(0xffffff, 0.3);
+scene.add(ambient);
+const pointLight = new THREE.PointLight(0xffffff, 1.2);
+pointLight.position.set(50,50,50);
+scene.add(pointLight);
+
+// ---------------- Moon / Treasury ----------------
+const moonGeometry = new THREE.SphereGeometry(5,32,32);
+const moonMaterial = new THREE.MeshStandardMaterial({
+    color: 0x8888ff,
+    emissive: 0x0000ff,
+    emissiveIntensity: 0.5
+});
+const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+moon.position.set(0,20,0);
+scene.add(moon);
+
+const treasuryBalance = { value: 0 }; // Replace with live balance
+const moonFullThreshold = 1000000000;
+const sunThreshold = 2000000000;
+
+// ---------------- Shattered Planet ----------------
+const planetFragments = [];
+const fragmentCount = 12;
+for(let i=0;i<fragmentCount;i++){
+    const geom = new THREE.BoxGeometry(3,3,3);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x228822 });
+    const frag = new THREE.Mesh(geom, mat);
+    frag.position.set(
+        (Math.random()-0.5)*40,
+        (Math.random()-0.5)*10,
+        (Math.random()-0.5)*40
+    );
+    scene.add(frag);
+    planetFragments.push(frag);
+}
+let burnProgress = 0;
+
+// ---------------- Stars ----------------
+const starGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+const starMaterial = new THREE.MeshStandardMaterial({ color: 0xffffaa });
+const stars = [];
+const starCount = 100;
+for(let i=0;i<starCount;i++){
+    const star = new THREE.Mesh(starGeometry, starMaterial.clone());
+    star.position.set(
+        (Math.random()-0.5)*200,
+        (Math.random()-0.5)*100,
+        (Math.random()-0.5)*200
+    );
+    scene.add(star);
+    stars.push(star);
+}
+
+// ---------------- Transaction Beams ----------------
+const beams = [];
+function shootBeam(from, to, color=0xffaa00){
+    const curve = new THREE.QuadraticBezierCurve3(
+        from,
+        new THREE.Vector3(
+            (from.x+to.x)/2,
+            Math.max(from.y,to.y)+10+Math.random()*10,
+            (from.z+to.z)/2
+        ),
+        to
+    );
+    const points = curve.getPoints(20);
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({ color: color });
+    const line = new THREE.Line(geometry, material);
+    line.life = 100; // frames
+    beams.push(line);
+    scene.add(line);
+}
+
+// ---------------- Animation ----------------
+function animate(){
+    requestAnimationFrame(animate);
+
+    // Demo: Increase treasuryBalance
+    treasuryBalance.value += 5000000;
+
+    const moonRatio = Math.min(treasuryBalance.value / moonFullThreshold,1);
+    moon.scale.setScalar(0.5 + 1.5*moonRatio);
+    if(treasuryBalance.value >= sunThreshold){
+        moon.material.color.set(0xffdd33);
+        moon.material.emissive.set(0xffaa00);
+        moon.material.emissiveIntensity = 1.5;
+    } else {
+        moon.material.color.set(0x8888ff);
+        moon.material.emissive.set(0x0000ff);
+        moon.material.emissiveIntensity = 0.5 + 1*moonRatio;
+    }
+
+    planetFragments.forEach(frag=>{
+        frag.position.lerp(new THREE.Vector3(0,0,0), burnProgress);
+    });
+
+    for(let i=beams.length-1;i>=0;i--){
+        beams[i].life--;
+        if(beams[i].life<=0){
+            scene.remove(beams[i]);
+            beams.splice(i,1);
         }
-        scene.add(planetGroup);
+    }
 
-        // --- 3. THE CRESCENT MOON (Zero-Math Shadow Trick) ---
-        const moonGeo = new THREE.SphereGeometry(4, 24, 24);
-        const moonMat = new THREE.MeshPhongMaterial({ color: 0xffffaa, emissive: 0x222211 });
-        const moon = new THREE.Mesh(moonGeo, moonMat);
-        moon.position.set(18, 15, -10);
-        scene.add(moon);
+    renderer.render(scene, camera);
+}
+animate();
 
-        // The "Shadow" is just a slightly larger black sphere hiding part of the yellow one
-        const shadowGeo = new THREE.SphereGeometry(4.1, 24, 24);
-        const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); // Pure black, ignores light
-        const moonShadow = new THREE.Mesh(shadowGeo, shadowMat);
-        moonShadow.position.set(21, 15, -9); 
-        scene.add(moonShadow);
+// ---------------- Demo: random beams ----------------
+setInterval(()=>{
+    const star = stars[Math.floor(Math.random()*stars.length)];
+    if(Math.random()<0.7){
+        shootBeam(star.position, moon.position);
+    } else {
+        shootBeam(star.position, new THREE.Vector3(0,0,0));
+        burnProgress = Math.min(burnProgress + 0.01, 1);
+    }
+}, 500);
 
-        // --- 4. ANIMATION LOOP ---
-        function animate() {
-            requestAnimationFrame(animate);
-            planetGroup.rotation.y += 0.003;
-            planetGroup.rotation.x += 0.001;
-            renderer.render(scene, camera);
-        }
-        animate();
+window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
 
-        // Handle screen rotation/resizing safely
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-    </script>
 </body>
 </html>
