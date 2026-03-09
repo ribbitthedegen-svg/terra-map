@@ -183,7 +183,7 @@
 
         // Simple click-to-copy for the mystery address
         document.querySelector('#satellite-log span').addEventListener('click', function() {
-            const addr = "terra1...YOUR_WALLET_HERE"; // Put your real wallet here
+            const addr = "terra1jpddm2phs4mtxxjwepxccqzm4f465zchx7um32"; // Put your real wallet here
             navigator.clipboard.writeText(addr);
             this.innerText = "COPIED_TO_BUFFER";
             setTimeout(() => { this.innerText = "terra1...[CLICK_TO_VIEW]"; }, 2000);
