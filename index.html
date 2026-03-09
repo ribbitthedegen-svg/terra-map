@@ -31,6 +31,18 @@
         .search-container { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; z-index: 90; }
         input { background: rgba(0,0,0,0.7); border: 1px solid #3498db; color: white; padding: 12px; border-radius: 5px; width: 280px; outline: none; }
         button#locate { background: #3498db; border: none; color: white; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: bold; }
+
+        /* This forces the 3D Engine to the background */
+        canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        /* This forces all UI elements to the very front */
+        #ui, #footer, #satellite-log, .search-container, #boot-screen {
+            z-index: 100 !important;
+        }
     </style>
 </head>
 <body>
@@ -99,11 +111,11 @@
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ 
           antialias: true, 
-          preserveDrawingBuffer: true,
-          alpha: true 
+          preserveDrawingBuffer: true
         });
-        renderer.setClearColor(0x000000, 0); // This makes the background transparent
+        // Remove the 'alpha' and 'setClearColor' lines entirely
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio); // Add this for crisp mobile graphics
         document.body.appendChild(renderer.domElement);
 
         // --- THE SHATTERED CORE ---
