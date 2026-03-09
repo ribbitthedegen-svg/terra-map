@@ -10,8 +10,8 @@
         canvas { display: block; position: fixed; top: 0; left: 0; z-index: 1; }
         #ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
         .gold { color: #f1c40f; font-weight: bold; text-shadow: 0 0 5px #000; }
+        .red { color: #e74c3c; font-weight: bold; text-shadow: 0 0 5px #000; }
         
-        /* Force log to top, footer safely above mobile menus */
         #log { position: absolute; top: 25px; left: 25px; pointer-events: auto; text-shadow: 0 0 5px #000; }
         #footer { position: absolute; bottom: 100px; left: 25px; pointer-events: auto; text-shadow: 0 0 5px #000; }
     </style>
@@ -22,9 +22,10 @@
             <h1>SATELLITE: LUNC-RECO-01</h1>
             <p>CHAIN_INTEGRITY: <span id="percent" class="gold">FETCHING...</span></p>
             <p>TREASURY_PHASE: <span id="phase-text" style="color: #2ecc71;">SYNCING...</span></p>
+            <p>NETWORK_TRAFFIC: <span id="tx-log" class="red">AWAITING_BLOCK...</span></p>
         </div>
         <div id="footer">
-            <p>GALAXY_NODES: 150 SECURED</p>
+            <p>GALAXY_NODES: 150 ACTIVE</p>
             <p>RESERVE_LEVEL: <span id="res" class="gold">CONNECTING...</span></p>
         </div>
     </div>
@@ -32,8 +33,9 @@
     <script>
         let wallet = "terra18pddm2phs4mtxxjwpxccqzm4f465zchx7um32";
         let repairFactor = 0.1;
+        let txQueue = 0; // Holds the real transactions waiting to be animated
 
-        // --- 1. SCENE SETUP (Mobile Optimized) ---
+        // --- 1. SCENE SETUP ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
         camera.position.z = 40; 
@@ -47,7 +49,7 @@
         scene.add(light);
         scene.add(new THREE.AmbientLight(0x444444));
 
-        // --- 2. THE CORE (35 lightweight shards) ---
+        // --- 2. THE CORE ---
         const planetGroup = new THREE.Group();
         const shardGeo = new THREE.IcosahedronGeometry(1.2, 0);
         const shardMat = new THREE.MeshPhongMaterial({ color: 0x3498db, flatShading: true });
@@ -63,9 +65,8 @@
         }
         scene.add(planetGroup);
 
-        // --- 3. THE CRESCENT MOON (Mobile-Safe Group) ---
+        // --- 3. THE MOON (Razor Crescent) ---
         const moonGroup = new THREE.Group();
-        
         const moonGeo = new THREE.SphereGeometry(3.5, 32, 32);
         const moonMat = new THREE.MeshPhongMaterial({ color: 0xffffaa, emissive: 0x222211 });
         const moon = new THREE.Mesh(moonGeo, moonMat);
@@ -74,13 +75,13 @@
         const shadowGeo = new THREE.SphereGeometry(3.6, 32, 32);
         const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); 
         const moonShadow = new THREE.Mesh(shadowGeo, shadowMat);
-        moonShadow.position.set(2.5, 0, 1); // Default Crescent
+        moonShadow.position.set(1.2, 0, 1); 
         moonGroup.add(moonShadow);
 
         moonGroup.position.set(10, 14, -10); 
         scene.add(moonGroup);
 
-        // --- 4. THE GALAXY (Ultra-Lightweight Point Cloud) ---
+        // --- 4. THE WALLET NETWORK (Stars) ---
         const starGeo = new THREE.BufferGeometry();
         const starPos = [];
         for(let i=0; i<150; i++) {
@@ -90,8 +91,19 @@
         const starPoints = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.3 }));
         scene.add(starPoints);
 
-        // --- 5. THE DATA LINK (Mobile-Safe Fetch) ---
-        async function updateData() {
+        // --- 4.5 TRANSFER BEAMS (Expanded Pool for Live Data) ---
+        const beams = [];
+        const beamMat = new THREE.LineBasicMaterial({ color: 0x5dade2, transparent: true, opacity: 0 });
+        for(let i=0; i<15; i++) { // 15 beams can be active at once
+            const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0)]), beamMat.clone());
+            line.userData = { life: 0, active: false };
+            scene.add(line);
+            beams.push(line);
+        }
+
+        // --- 5. LIVE DATA FETCHING ---
+        // Fetch 1: Personal Treasury Data (Every 60s)
+        async function fetchTreasury() {
             try {
                 const r = await fetch(`https://terra-classic-lcd.publicnode.com/cosmos/bank/v1beta1/balances/${wallet}`);
                 const d = await r.json();
@@ -109,21 +121,35 @@
                     moonShadow.position.x = 10;
                     document.getElementById('phase-text').innerText = "FULL_MOON";
                 } else if (balance >= 1000000) {
-                    moonShadow.position.x = 4.0;
+                    moonShadow.position.x = 3.5;
                     document.getElementById('phase-text').innerText = "WAXING";
                 } else {
-                    moonShadow.position.x = 2.5; 
+                    moonShadow.position.x = 1.2; 
                     document.getElementById('phase-text').innerText = "CRESCENT";
                 }
                 
                 repairFactor = Math.max(0.15, Math.min(balance / 10000000, 1));
                 document.getElementById('percent').innerText = Math.round(repairFactor * 100) + '%';
-
             } catch (e) {
-                console.log("Using cached signal...");
-                document.getElementById('res').innerText = "99.50 LUNC (CACHED)";
-                document.getElementById('percent').innerText = "15%";
-                document.getElementById('phase-text').innerText = "CRESCENT";
+                console.log("Treasury cache used.");
+            }
+        }
+
+        // Fetch 2: Live Network Block Data (Every 15s)
+        async function fetchLatestBlock() {
+            try {
+                const r = await fetch('https://terra-classic-lcd.publicnode.com/cosmos/base/tendermint/v1beta1/blocks/latest');
+                const d = await r.json();
+                
+                // Count how many real transactions are in this block
+                const txCount = d.block?.data?.txs?.length || 0;
+                
+                // Add real txs to the queue (cap at 45 to prevent mobile lag)
+                txQueue = Math.min(txQueue + txCount, 45); 
+                
+                document.getElementById('tx-log').innerText = `${txCount} TXS IN BLOCK`;
+            } catch(e) {
+                document.getElementById('tx-log').innerText = "NODE_SYNC_DELAY";
             }
         }
 
@@ -134,16 +160,46 @@
             planetGroup.rotation.x += 0.001;
             starPoints.rotation.y += 0.0005;
             
+            // Core Gravity
             shards.forEach(s => {
                 s.position.lerpVectors(s.userData.origin, new THREE.Vector3(0,0,0), repairFactor);
+            });
+
+            // REAL DATA Transfer Beams Logic
+            starPoints.updateMatrixWorld();
+            beams.forEach(beam => {
+                // If we have real transactions waiting, fire a beam!
+                if (!beam.userData.active && txQueue > 0 && Math.random() > 0.8) {
+                    txQueue--; // Remove one real transaction from the queue
+                    beam.userData.active = true;
+                    beam.userData.life = 1.0;
+                    
+                    const i = Math.floor(Math.random() * 150) * 3;
+                    const starVec = new THREE.Vector3(starPos[i], starPos[i+1], starPos[i+2]);
+                    starVec.applyMatrix4(starPoints.matrixWorld); 
+                    beam.geometry.setFromPoints([new THREE.Vector3(0,0,0), starVec]);
+                }
+                
+                if (beam.userData.active) {
+                    beam.userData.life -= 0.02; // Fade speed
+                    beam.material.opacity = beam.userData.life * 0.6; 
+                    if (beam.userData.life <= 0) beam.userData.active = false;
+                }
             });
 
             renderer.render(scene, camera);
         }
         
+        // Start engine
         animate();
-        updateData();
-        setInterval(updateData, 60000); 
+        
+        // Fetch personal balance every 60s
+        fetchTreasury();
+        setInterval(fetchTreasury, 60000); 
+
+        // Fetch LIVE blockchain traffic every 15s
+        fetchLatestBlock();
+        setInterval(fetchLatestBlock, 15000);
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
