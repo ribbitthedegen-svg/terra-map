@@ -6,34 +6,35 @@
     <title>Terra Classic: Reconstruction Satellite</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
+        /* Base Layer */
         body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: #5dade2; }
         
-        /* Layering: 3D Engine in back, UI in front */
+        /* 3D Engine Layer (Z=1) */
         canvas { position: fixed; top: 0; left: 0; z-index: 1; }
         
+        /* Dashboard Layer (Z=100) */
         #ui-layer { 
-            position: relative; 
+            position: absolute; 
+            inset: 0;
             z-index: 100 !important; 
-            height: 100vh; 
             display: flex; 
             flex-direction: column; 
             justify-content: space-between; 
             padding: 20px;
-            pointer-events: none; /* Allows clicking through to 3D if needed */
+            pointer-events: none;
         }
         
-        #satellite-log, #footer, .search-container, h1 { pointer-events: auto; }
+        #satellite-log, #footer, .search-container, h1, .integrity-bar { pointer-events: auto; text-shadow: 0 0 5px #000; }
         
         .integrity-bar { color: #f1c40f; font-weight: bold; }
-        #moon-status { color: #f1c40f; text-shadow: 0 0 10px rgba(241, 196, 15, 0.5); }
+        #moon-status { color: #f1c40f; font-weight: bold; }
         
-        .search-container { margin-top: 10px; }
-        input { background: rgba(0,0,0,0.7); border: 1px solid #5dade2; color: #fff; padding: 8px; width: 220px; }
-        button { background: #3498db; border: none; color: #fff; padding: 8px 15px; cursor: pointer; }
+        .search-container { margin-top: 10px; display: flex; gap: 5px; }
+        input { background: rgba(0,0,0,0.8); border: 1px solid #5dade2; color: #fff; padding: 10px; width: 60%; font-size: 12px; }
+        button { background: #3498db; border: none; color: #fff; padding: 10px; cursor: pointer; font-weight: bold; }
         
-        /* Pulse effect for the reconstruction */
         .pulse { animation: scan 2s infinite; }
-        @keyframes scan { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        @keyframes scan { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
     </style>
 </head>
 <body>
@@ -47,52 +48,45 @@
 
         <div id="footer">
             <div class="search-container">
-                <input type="text" id="wallet-input" placeholder="ENTER terra1... ADDRESS">
-                <button onclick="updateWallet()">LOCATE_STAR</button>
+                <input type="text" id="wallet-input" placeholder="terra1... ADDRESS">
+                <button onclick="updateWallet()">LOCATE</button>
             </div>
-            <p style="margin-top: 20px;">[SIGNAL_LOG_09.03.2026]</p>
-            <p>SATELLITE_ID: LUNC-RECO-01</p>
-            <p>RESERVE_LEVEL: <span id="moon-status">CONNECTING...</span></p>
+            <p style="margin-top: 15px; font-size: 10px;">[SIGNAL_LOG_09.03.2026] SATELLITE_ID: LUNC-RECO-01</p>
+            <p>RESERVE_LEVEL: <span id="moon-status">SYNCING...</span></p>
         </div>
     </div>
 
     <script>
         // --- CONFIG ---
-        let walletAddress = "terra18pddm2phs4mtxxjwpxccqzm4f465zchx7um32"; 
+        let walletAddress = "terra18pddm2phs4mtxxjwpxccqzm4f465zchx7um32"; // Your verified address
         
         // --- THREE.JS ENGINE ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        camera.position.z = 45; 
+        camera.position.z = 40; 
 
-        // Renderer with alpha for layering support
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
         // --- LIGHTING ---
-        const sun = new THREE.PointLight(0xffffff, 1.2);
-        sun.position.set(20, 20, 20);
+        const sun = new THREE.PointLight(0xffffff, 1.5);
+        sun.position.set(10, 10, 20);
         scene.add(sun);
-        scene.add(new THREE.AmbientLight(0x333333));
+        scene.add(new THREE.AmbientLight(0x444444));
 
         // --- THE SHATTERED CORE ---
         const planetGroup = new THREE.Group();
         const shards = [];
-        const shardGeom = new THREE.IcosahedronGeometry(1.2, 0);
+        const shardGeom = new THREE.IcosahedronGeometry(1, 0);
         const shardMat = new THREE.MeshPhongMaterial({ color: 0x3498db, flatShading: true, transparent: true, opacity: 0.8 });
 
-        for(let i=0; i<80; i++) {
+        for(let i=0; i<60; i++) {
             const shard = new THREE.Mesh(shardGeom, shardMat);
-            const dist = 18 + Math.random() * 12;
-            shard.position.set(
-                (Math.random() - 0.5) * dist,
-                (Math.random() - 0.5) * dist,
-                (Math.random() - 0.5) * dist
-            );
+            const dist = 15 + Math.random() * 10;
+            shard.position.set((Math.random()-0.5)*dist, (Math.random()-0.5)*dist, (Math.random()-0.5)*dist);
             shard.userData.origin = shard.position.clone();
-            shard.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, 0);
             planetGroup.add(shard);
             shards.push(shard);
         }
@@ -108,51 +102,40 @@
                 const balanceObj = data.balances.find(b => b.denom === 'uluna');
                 const balance = balanceObj ? parseFloat(balanceObj.amount) / 1000000 : 0;
 
-                // Update UI balance
-                document.getElementById('moon-status').innerText = balance.toLocaleString(undefined, {minimumFractionDigits: 2}) + " LUNC";
+                // Set UI Balance
+                document.getElementById('moon-status').innerText = balance.toLocaleString() + " LUNC";
                 
-                // Visual repair logic (Goal set to 1,000 LUNC for noticeable movement)
+                // Visual repair logic (Goal: 1,000 LUNC)
                 repairFactor = Math.min(balance / 1000, 1);
                 
-                // Keep shards visible even at 0%
-                const displayIntegrity = balance > 0 ? Math.max(repairFactor, 0.1) : 0;
+                // Ensure shards remain visible
+                const displayIntegrity = Math.max(repairFactor, 0.15);
                 document.getElementById('integrity-percent').innerText = Math.round(displayIntegrity * 100) + '%';
                 
             } catch (e) {
-                console.error("Signal Lost");
                 document.getElementById('moon-status').innerText = "SIGNAL_LOST";
             }
         }
 
         function updateWallet() {
-            const input = document.getElementById('wallet-input').value;
-            if(input.startsWith('terra1')) {
-                walletAddress = input;
-                updateData();
-            }
+            const val = document.getElementById('wallet-input').value;
+            if(val.startsWith('terra1')) { walletAddress = val; updateData(); }
         }
 
         // --- ANIMATION LOOP ---
         function animate() {
             requestAnimationFrame(animate);
+            planetGroup.rotation.y += 0.003; // Rotate planet shards
             
-            // Spin the planet shards
-            planetGroup.rotation.y += 0.002;
-            planetGroup.rotation.x += 0.001;
-            
-            // Move shards toward center based on treasury health
             shards.forEach(s => {
                 s.position.lerpVectors(s.userData.origin, new THREE.Vector3(0,0,0), repairFactor);
-                s.rotation.x += 0.01;
             });
 
-            renderer.render(scene, camera);
+            renderer.render(scene, camera); // Ignition command
         }
 
-        // INITIALIZE
         updateData();
         animate();
-        setInterval(updateData, 30000); // Auto-refresh every 30 seconds
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
