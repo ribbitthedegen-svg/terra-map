@@ -3,209 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUNC // SATELLITE LINK</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <title>LUNC // BURN_REALITY</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Courier New', monospace; color: #5dade2; }
-        canvas { display: block; position: fixed; top: 0; left: 0; z-index: 1; }
-        #ui { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; pointer-events: none; }
-        .gold { color: #f1c40f; font-weight: bold; text-shadow: 0 0 5px #000; }
-        .red { color: #e74c3c; font-weight: bold; text-shadow: 0 0 5px #000; }
-        
-        #log { position: absolute; top: 25px; left: 25px; pointer-events: auto; text-shadow: 0 0 5px #000; }
-        #footer { position: absolute; bottom: 100px; left: 25px; pointer-events: auto; text-shadow: 0 0 5px #000; }
+        body { background-color: #050505; font-family: 'Courier New', monospace; }
+        .stat-card { border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(15, 23, 42, 0.5); }
     </style>
 </head>
-<body>
-    <div id="ui">
-        <div id="log">
-            <h1>SATELLITE: LUNC-RECO-01</h1>
-            <p>CHAIN_INTEGRITY: <span id="percent" class="gold">FETCHING...</span></p>
-            <p>TREASURY_PHASE: <span id="phase-text" style="color: #2ecc71;">SYNCING...</span></p>
-            <p>NETWORK_TRAFFIC: <span id="tx-log" class="red">AWAITING_BLOCK...</span></p>
+<body class="text-slate-300 p-6">
+
+    <div class="max-w-md mx-auto mb-8 border-b border-slate-800 pb-4">
+        <h1 class="text-2xl font-bold text-blue-500 tracking-tighter">LUNC // REALITY_SCAN</h1>
+        <p class="text-[10px] text-slate-500 uppercase tracking-widest">System Status: Connected to Terra-Classic</p>
+    </div>
+
+    <div class="max-w-md mx-auto space-y-4">
+        
+        <div class="stat-card p-5 rounded-xl">
+            <p class="text-[10px] uppercase text-slate-500 mb-1">Circulating Supply</p>
+            <div class="flex items-baseline gap-2">
+                <h2 id="supply" class="text-3xl font-bold text-white">5.47</h2>
+                <span class="text-blue-500 font-bold">T</span>
+            </div>
+            <div class="mt-3 w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+                <div id="progress-bar" class="bg-blue-500 h-full transition-all duration-1000" style="width: 15%"></div>
+            </div>
         </div>
-        <div id="footer">
-            <p>GALAXY_NODES: 150 ACTIVE</p>
-            <p>RESERVE_LEVEL: <span id="res" class="gold">CONNECTING...</span></p>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div class="stat-card p-4 rounded-xl">
+                <p class="text-[10px] uppercase text-slate-500 mb-1 italic">Target: $0.01</p>
+                <h3 id="days-01" class="text-xl font-bold text-white">---</h3>
+                <p class="text-[9px] text-blue-400 uppercase">Days Left</p>
+            </div>
+            <div class="stat-card p-4 rounded-xl">
+                <p class="text-[10px] uppercase text-slate-500 mb-1 italic">Target: $1.00</p>
+                <h3 id="years-1" class="text-xl font-bold text-white">---</h3>
+                <p class="text-[9px] text-blue-400 uppercase">Years Left</p>
+            </div>
         </div>
+
+        <div class="stat-card p-4 rounded-xl border-dashed">
+            <h4 class="text-[10px] font-bold text-slate-400 mb-3 border-b border-slate-800 pb-1 uppercase">Burn Parameters</h4>
+            <div class="space-y-2 text-xs">
+                <div class="flex justify-between">
+                    <span>DAILY_BURN_AVG:</span>
+                    <span class="text-green-400">540M LUNC</span>
+                </div>
+                <div class="flex justify-between">
+                    <span>MARKET_CAP_EST:</span>
+                    <span class="text-white">$242M</span>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        let wallet = "terra18pddm2phs4mtxxjwpxccqzm4f465zchx7um32";
-        let repairFactor = 0.1;
-        let txQueue = 0; // Holds the real transactions waiting to be animated
-
-        // --- 1. SCENE SETUP ---
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-        camera.position.z = 40; 
+        const wallet = "terra18pddm2phs4mtxxjwpxccqzm4f465zchx7um32";
         
-        const renderer = new THREE.WebGLRenderer({ antialias: false });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.appendChild(renderer.domElement);
-
-        const light = new THREE.PointLight(0xffffff, 1.2);
-        light.position.set(20, 20, 20);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x444444));
-
-        // --- 2. THE CORE ---
-        const planetGroup = new THREE.Group();
-        const shardGeo = new THREE.IcosahedronGeometry(1.2, 0);
-        const shardMat = new THREE.MeshPhongMaterial({ color: 0x3498db, flatShading: true });
-        
-        const shards = [];
-        for(let i=0; i<35; i++) {
-            const s = new THREE.Mesh(shardGeo, shardMat);
-            const d = 10 + Math.random() * 8;
-            s.position.set((Math.random()-0.5)*d, (Math.random()-0.5)*d, (Math.random()-0.5)*d);
-            s.userData.origin = s.position.clone();
-            planetGroup.add(s);
-            shards.push(s);
-        }
-        scene.add(planetGroup);
-
-        // --- 3. THE MOON (Razor Crescent) ---
-        const moonGroup = new THREE.Group();
-        const moonGeo = new THREE.SphereGeometry(3.5, 32, 32);
-        const moonMat = new THREE.MeshPhongMaterial({ color: 0xffffaa, emissive: 0x222211 });
-        const moon = new THREE.Mesh(moonGeo, moonMat);
-        moonGroup.add(moon);
-
-        const shadowGeo = new THREE.SphereGeometry(3.6, 32, 32);
-        const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000 }); 
-        const moonShadow = new THREE.Mesh(shadowGeo, shadowMat);
-        moonShadow.position.set(1.2, 0, 1); 
-        moonGroup.add(moonShadow);
-
-        moonGroup.position.set(10, 14, -10); 
-        scene.add(moonGroup);
-
-        // --- 4. THE WALLET NETWORK (Stars) ---
-        const starGeo = new THREE.BufferGeometry();
-        const starPos = [];
-        for(let i=0; i<150; i++) {
-            starPos.push((Math.random()-0.5)*150, (Math.random()-0.5)*150, (Math.random()-0.5)*150);
-        }
-        starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-        const starPoints = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.3 }));
-        scene.add(starPoints);
-
-        // --- 4.5 TRANSFER BEAMS (Expanded Pool for Live Data) ---
-        const beams = [];
-        const beamMat = new THREE.LineBasicMaterial({ color: 0x5dade2, transparent: true, opacity: 0 });
-        for(let i=0; i<15; i++) { // 15 beams can be active at once
-            const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,0)]), beamMat.clone());
-            line.userData = { life: 0, active: false };
-            scene.add(line);
-            beams.push(line);
-        }
-
-        // --- 5. LIVE DATA FETCHING ---
-        // Fetch 1: Personal Treasury Data (Every 60s)
-        async function fetchTreasury() {
+        async function updateReality() {
             try {
-                const r = await fetch(`https://terra-classic-lcd.publicnode.com/cosmos/bank/v1beta1/balances/${wallet}`);
+                // 1. Fetch real supply from the chain
+                const r = await fetch('https://terra-classic-lcd.publicnode.com/cosmos/bank/v1beta1/supply/by_denom?denom=uluna');
                 const d = await r.json();
-                const b = d.balances.find(x => x.denom === 'uluna');
-                let balance = b ? parseFloat(b.amount) / 1000000 : 99.5;
+                const totalAmount = parseFloat(d.amount.amount) / 1000000;
+                
+                // 2. Constants for Math
+                const dailyBurn = 540000000; // Est 540M per day based on volume
+                const mCap = 242000000; // Current Market Cap
+                
+                // 3. Math Logic
+                // Target Supply = Market Cap / Target Price
+                const targetSupply01 = mCap / 0.01;
+                const targetSupply1 = mCap / 1.00;
+                
+                const daysTo01 = Math.max(0, (totalAmount - targetSupply01) / dailyBurn);
+                const daysTo1 = Math.max(0, (totalAmount - targetSupply1) / dailyBurn);
 
-                document.getElementById('res').innerText = balance.toLocaleString() + " LUNC";
+                // 4. Update UI
+                document.getElementById('supply').innerText = (totalAmount / 1e12).toFixed(3);
+                document.getElementById('days-01').innerText = Math.floor(daysTo01).toLocaleString();
+                document.getElementById('years-1').innerText = (daysTo1 / 365).toFixed(1);
                 
-                if (balance >= 100000000) {
-                    moonMat.color.setHex(0xffaa00);
-                    moonMat.emissive.setHex(0x552200);
-                    moonShadow.position.x = 10;
-                    document.getElementById('phase-text').innerText = "SOLAR_IGNITION";
-                } else if (balance >= 50000000) {
-                    moonShadow.position.x = 10;
-                    document.getElementById('phase-text').innerText = "FULL_MOON";
-                } else if (balance >= 1000000) {
-                    moonShadow.position.x = 3.5;
-                    document.getElementById('phase-text').innerText = "WAXING";
-                } else {
-                    moonShadow.position.x = 1.2; 
-                    document.getElementById('phase-text').innerText = "CRESCENT";
-                }
-                
-                repairFactor = Math.max(0.15, Math.min(balance / 10000000, 1));
-                document.getElementById('percent').innerText = Math.round(repairFactor * 100) + '%';
+                // Visual Progress
+                const progress = (1 - (totalAmount / 6.9e12)) * 100;
+                document.getElementById('progress-bar').style.width = progress + "%";
+
             } catch (e) {
-                console.log("Treasury cache used.");
+                document.getElementById('tx-log').innerText = "DATA_LINK_ERROR";
             }
         }
 
-        // Fetch 2: Live Network Block Data (Every 15s)
-        async function fetchLatestBlock() {
-            try {
-                const r = await fetch('https://terra-classic-lcd.publicnode.com/cosmos/base/tendermint/v1beta1/blocks/latest');
-                const d = await r.json();
-                
-                // Count how many real transactions are in this block
-                const txCount = d.block?.data?.txs?.length || 0;
-                
-                // Add real txs to the queue (cap at 45 to prevent mobile lag)
-                txQueue = Math.min(txQueue + txCount, 45); 
-                
-                document.getElementById('tx-log').innerText = `${txCount} TXS IN BLOCK`;
-            } catch(e) {
-                document.getElementById('tx-log').innerText = "NODE_SYNC_DELAY";
-            }
-        }
-
-        // --- 6. ANIMATION LOOP ---
-        function animate() {
-            requestAnimationFrame(animate);
-            planetGroup.rotation.y += 0.003;
-            planetGroup.rotation.x += 0.001;
-            starPoints.rotation.y += 0.0005;
-            
-            // Core Gravity
-            shards.forEach(s => {
-                s.position.lerpVectors(s.userData.origin, new THREE.Vector3(0,0,0), repairFactor);
-            });
-
-            // REAL DATA Transfer Beams Logic
-            starPoints.updateMatrixWorld();
-            beams.forEach(beam => {
-                // If we have real transactions waiting, fire a beam!
-                if (!beam.userData.active && txQueue > 0 && Math.random() > 0.8) {
-                    txQueue--; // Remove one real transaction from the queue
-                    beam.userData.active = true;
-                    beam.userData.life = 1.0;
-                    
-                    const i = Math.floor(Math.random() * 150) * 3;
-                    const starVec = new THREE.Vector3(starPos[i], starPos[i+1], starPos[i+2]);
-                    starVec.applyMatrix4(starPoints.matrixWorld); 
-                    beam.geometry.setFromPoints([new THREE.Vector3(0,0,0), starVec]);
-                }
-                
-                if (beam.userData.active) {
-                    beam.userData.life -= 0.02; // Fade speed
-                    beam.material.opacity = beam.userData.life * 0.6; 
-                    if (beam.userData.life <= 0) beam.userData.active = false;
-                }
-            });
-
-            renderer.render(scene, camera);
-        }
-        
-        // Start engine
-        animate();
-        
-        // Fetch personal balance every 60s
-        fetchTreasury();
-        setInterval(fetchTreasury, 60000); 
-
-        // Fetch LIVE blockchain traffic every 15s
-        fetchLatestBlock();
-        setInterval(fetchLatestBlock, 15000);
-
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        updateReality();
+        setInterval(updateReality, 60000); // Update every minute
     </script>
 </body>
 </html>
